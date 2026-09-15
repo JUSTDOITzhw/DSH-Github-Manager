@@ -456,17 +456,43 @@ try {
      (`.sidebarCol{overflow:hidden}`) — so the row is folded into a column and
      this badge takes the last line, directly above Settings. */
   check('client folds the shared action row into a column',
-    clientSource.includes('foldFooterRow(row, wide)') && clientSource.includes('flexDirection = "column"'))
-  check('the fold is owned by the slot node and unwound again',
-    clientSource.includes('layer.current.parentElement') && clientSource.includes('?? undefined'))
-  /* Ascending `order` decides the line. The number only has to beat the other
-     occupants of this slot, and dsh-cost-meter's highest is 2 (the shipped
-     Cordis button uses the default 0). */
+    clientSource.includes('flexDirection = "column"'))
+  /* Ascending `order` decides the line, and the number only has to beat the
+     other occupants of this slot (dsh-cost-meter's highest is 2). The register
+     option is documentation: the shell's list renderer did not reorder reliably
+     across two live runs, so the guarantee is the flex `order` in our own
+     stylesheet. */
   const footerOrder = /id:\s*"github-manager",\n\s*order:\s*(\d+)/.exec(clientSource)
-  check('the badge is ordered below every other action',
+  check('the badge registers a late order',
     footerOrder !== null && Number(footerOrder[1]) > 2,
     footerOrder === null ? 'the slot entry declares no order' : footerOrder[1])
+  eq('the badge sorts itself onto the last line', decl(ci.CSS, '.dsh-gm-layer', 'order'), '999')
 
+  /* The list slot wraps its occupants in a `display:contents` element, which
+     generates no box at all: the items are packed by the nearest ancestor that
+     does have one, one level up. Folding `parentElement` was therefore a silent
+     no-op — measured on a 280px sidebar, the row stayed `row`, the balance card
+     was squeezed to 154px of a 256px line and this badge overhung it by 142px. */
+  check('client folds the row it actually shares',
+    clientSource.includes('foldFooterRow(findActionRow(node), wide) ?? undefined'))
+  check('the slot row is found through the DOM, like the panel anchor',
+    clientSource.includes('const node = layer.current') && clientSource.includes('anchorNode()'))
+  check('the slot row is found through the DOM, like the panel anchor',
+    clientSource.includes('const node = layer.current') && clientSource.includes('anchorNode()'))
+
+  const fakeRow = { name: 'the flex row' }
+  const wrapper = { name: 'the invisible slot wrapper', parentElement: fakeRow }
+  const ours = { name: 'our node', parentElement: wrapper }
+  const table = new Map([[ours, 'block'], [wrapper, 'contents'], [fakeRow, 'flex'], [{ name: 'footArea' }, 'flex']])
+  const displayOf = (el) => table.get(el) ?? 'block'
+  eq('the fold skips the invisible `<div style="display:contents">`', ci.findActionRow(ours, displayOf), fakeRow)
+  eq('with nothing mounted there is nothing to fold', ci.findActionRow(null, displayOf), null)
+  eq('an ancestor that is not a flex container is left alone',
+    ci.findActionRow({ parentElement: { parentElement: null } }, () => 'block'), null)
+  check('inline-flex counts as a row',
+    ci.findActionRow({ parentElement: { parentElement: null } }, () => 'inline-flex') !== null)
+  eq('an unknown display is never claimed as the row',
+    ci.findActionRow({ parentElement: { parentElement: null } }, () => ''), null)
   /* The fold rewrites an element the shell owns: it has to be reversible and
      safe when the slot is not mounted. */
   const foldable = { style: { flexDirection: 'row', alignItems: 'baseline' } }
