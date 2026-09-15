@@ -1,0 +1,18 @@
+# dsh-github-manager bundle patch.
+#
+# Inserted as a profile bundle layer over dsh-base. The row is a bare dual-face
+# plugin referenced by package name: the node half (exports ".") runs in the
+# host process and owns the GitHub credential plus the REST calls, while the
+# `dsh.client` declaration in package.json makes the browser half
+# (exports "./client") load in the Web GUI and mount a management panel into the
+# `sidebar.footer.action` slot.
+#
+# The chat tools (`mcp__github__*`) are deliberately NOT a second insert row.
+# The node half mounts `@deepseek-ai/dsh-mcp-client` as a child plugin of its own
+# (see `createMcpMount` in index.js), which ties the MCP bridge to this plugin's
+# install / disable / uninstall lifecycle. Declaring it here instead would make it
+# a separate install unit: removing this plugin would leave an orphan row behind
+# whose credential expression resolves to nothing.
+- insert:
+    - id: github-manager
+      name: dsh-github-manager
