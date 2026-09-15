@@ -34,6 +34,8 @@ Two ways, both in the panel's **账号 / Account** tab:
 | **Repos** | search, create (public/private), flip visibility, delete (typed `owner/repo` confirmation), open on GitHub |
 | **Upload** | built-in local file browser; push a **whole directory** or a **single file** |
 
+The entry point is a **GitHub badge at the foot of the sidebar**, on the row above Settings. That row is the `sidebar.footer.action` slot and `dsh-cost-meter` parks its balance card in it too, so the badge is content-sized and ellipsizes the account name (`@JUSTDO…`) when space runs out rather than claiming the whole row — claiming it pushes the balance card out of a sidebar column the shell clips, and it disappears. In the 56px folded rail the badge keeps the mark only, because the rail has barely a dozen pixels left once the balance chip is in it.
+
 Pushing a directory creates the repository when it does not exist, skips `node_modules` / `.git` / build output and friends, and uploads file by file through the **Git Data API** (blobs → tree → commit → ref) — no git binary required. Anything skipped or failed is listed explicitly rather than dropped silently.
 
 ## Mention a repository in the composer

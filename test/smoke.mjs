@@ -30,6 +30,26 @@ function eq(label, actual, expected) {
   check(label, same, same ? undefined : `expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`)
 }
 
+/**
+ * Read a single declaration out of the injected stylesheet.
+ *
+ * The footer geometry is a contract with a slot this plugin does not own, and
+ * that contract has already been broken once by a substring that happened to
+ * look right, so it is asserted property by property.
+ *
+ * @param css - the stylesheet text.
+ * @param selector - exact selector of the rule, e.g. `.dsh-gm-layer`.
+ * @param property - the declaration to read.
+ * @returns the value, or undefined when the rule or declaration is absent.
+ */
+function decl(css, selector, property) {
+  const quoted = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const rule = new RegExp(`(?:^|\\n)${quoted}\\{([^}]*)\\}`).exec(css)
+  if (rule === null) return undefined
+  const found = new RegExp(`(?:^|;)${property}:([^;]+)`).exec(rule[1])
+  return found === null ? undefined : found[1]
+}
+
 const root = mkdtempSync(join(tmpdir(), 'gh-manager-smoke-'))
 
 try {
@@ -426,9 +446,56 @@ try {
   check('client reads the owner wide prop', clientSource.includes('props.wide === false'))
   check('client renders a rail layer', clientSource.includes('dsh-gm-rail'))
   check('client defaults to the wide presentation', clientSource.includes('dsh-gm-layer'))
-  check('CSS carries the rail geometry', ci.CSS.includes('.dsh-gm-layer.dsh-gm-rail{width:36px'))
-  check('CSS rounds the rail badge', ci.CSS.includes('corner-shape:round;border-radius:50%'))
-  check('CSS keeps the wide layer geometry', ci.CSS.includes('.dsh-gm-layer{flex:none;align-items:center;width:100%;height:42px'))
+
+  /* `sidebar.footer.action` is a list slot rendered into ONE flex row, and
+     dsh-cost-meter parks its balance card in the same row while the shell clips
+     the column (`.sidebarCol{overflow:hidden}`). An action that claims the row
+     therefore does not crowd its neighbour, it pushes the neighbour out of the
+     column: the balance icon disappears. Our badge has to share the row. */
+  eq('the wide layer shares the row', decl(ci.CSS, '.dsh-gm-layer', 'flex'), '0 1 auto')
+  eq('the wide layer can shrink to nothing', decl(ci.CSS, '.dsh-gm-layer', 'min-width'), '0')
+  eq('the wide layer never claims the row', decl(ci.CSS, '.dsh-gm-layer', 'width'), 'auto')
+  eq('the wide layer centres against a taller neighbour', decl(ci.CSS, '.dsh-gm-layer', 'align-self'), 'center')
+  eq('the badge is content sized', decl(ci.CSS, '.dsh-gm-badge', 'width'), 'auto')
+  eq('the badge can shrink', decl(ci.CSS, '.dsh-gm-badge', 'min-width'), '0')
+  eq('the badge label can shrink', decl(ci.CSS, '.dsh-gm-badgeLabel', 'flex'), '0 1 auto')
+  check('the label truncates rather than pushing the row',
+    decl(ci.CSS, '.dsh-gm-badgeLabel', 'text-overflow') === 'ellipsis')
+  check('nothing asks for a full-width track',
+    /\.dsh-gm-(?:layer|badge)[^{}]*\{[^}]*width:calc\(100% \+/.test(ci.CSS) === false)
+  check('the badge does not fight the row with negative margins',
+    decl(ci.CSS, '.dsh-gm-badge', 'margin') === '0')
+
+  /* The folded rail is 56px wide with 10px of inline padding, so 36px of track
+     — and the balance chip already occupies 40px of it. Anything wider than an
+     icon gets clipped, which is why the rail variant is a 16px mark. */
+  eq('the rail layer is icon sized', decl(ci.CSS, '.dsh-gm-layer.dsh-gm-rail', 'width'), '16px')
+  eq('the rail layer never exceeds its track', decl(ci.CSS, '.dsh-gm-layer.dsh-gm-rail', 'max-width'), '16px')
+  eq('the rail badge matches the rail layer', decl(ci.CSS, '.dsh-gm-rail .dsh-gm-badge', 'width'), '16px')
+  eq('the rail badge drops the label', decl(ci.CSS, '.dsh-gm-rail .dsh-gm-badge', 'padding'), '0')
+
+  /* One shrinkable text run: a label plus a trailing hint split a tight budget
+     into two unreadable slivers. */
+  eq('badge label shows the account when bound', ci.badgeLabel(true, 'JUSTDOITzhw'), '@JUSTDOITzhw')
+  eq('badge label stands in when the login is unknown', ci.badgeLabel(true, ''), '已绑定')
+  eq('badge label falls back to GitHub when unbound', ci.badgeLabel(false, 'JUSTDOITzhw'), 'GitHub')
+  check('the badge renders one shrinkable text run',
+    clientSource.includes('badgeLabel(bound, login)') && clientSource.includes('"dsh-gm-badgeLabel"'))
+  check('the status dot is the only trailing mark',
+    clientSource.includes('bound ? null : h("span", { className: "dsh-gm-dot"'))
+  check('the redundant trailing hint is gone', clientSource.includes('dsh-gm-badgeHint') === false)
+
+  /* Render shape, exercised through the stubbed React: a tree rather than a
+     string, so a stray extra node cannot hide behind a substring match. */
+  const shapeOf = (wide) => {
+    const tree = ci.Badge({ wide })
+    const button = tree.children.filter((child) => child !== null && child.type === 'button')[0]
+    return button.children.filter((child) => child !== null && child !== undefined)
+      .map((child) => child.props?.className
+        ?? (typeof child.type === 'function' ? child.type.name : child.type))
+  }
+  eq('the wide badge is mark + label + status dot', shapeOf(true), ['GitHubMark', 'dsh-gm-badgeLabel', 'dsh-gm-dot'])
+  eq('the rail badge drops the label', shapeOf(false), ['GitHubMark', 'dsh-gm-dot'])
 
   eq('formatBytes prints bytes', ci.formatBytes(512), '512 B')
   eq('formatBytes prints kilobytes', ci.formatBytes(2048), '2.0 KB')
@@ -817,7 +884,6 @@ try {
   check('CSS uses semantic aliases', ci.CSS.includes('--dsw-alias-'))
   check('CSS does not branch on a theme attribute', /\[data-theme/.test(ci.CSS) === false)
   check('the panel is positioned fixed', ci.CSS.includes('position:fixed'))
-  check('the badge fills the sidebar column', ci.CSS.includes('width:calc(100% + 4px)'))
   check('a delete confirmation input exists', clientSource.includes('confirm'))
 } finally {
   rmSync(root, { recursive: true, force: true })
