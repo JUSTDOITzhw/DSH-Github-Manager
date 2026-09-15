@@ -55,10 +55,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/JUSTDOITzhw/dsh-github-manager.git"
+    "url": "git+https://github.com/JUSTDOITzhw/DSH-Github-Manager.git"
   },
-  "homepage": "https://github.com/JUSTDOITzhw/dsh-github-manager#readme",
+  "homepage": "https://github.com/JUSTDOITzhw/DSH-Github-Manager#readme",
   "bugs": {
-    "url": "https://github.com/JUSTDOITzhw/dsh-github-manager/issues"
+    "url": "https://github.com/JUSTDOITzhw/DSH-Github-Manager/issues"
   }
 }

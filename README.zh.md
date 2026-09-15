@@ -12,7 +12,7 @@
 
 ```sh
 # 从 GitHub 安装（推荐）
-dsh plugin --profile web add github:JUSTDOITzhw/dsh-github-manager
+dsh plugin --profile web add github:JUSTDOITzhw/DSH-Github-Manager
 
 # 本地开发：源码就在 profiles/web/plugins/ 下，改完刷新即生效
 dsh plugin --profile web add "link:C:/Users/Administrator/.dsh/profiles/web/plugins/dsh-github-manager"

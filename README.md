@@ -13,7 +13,7 @@ And it turns on the **built-in GitHub MCP bridge**: the official GitHub MCP serv
 ## Install
 
 ```sh
-dsh plugin --profile web add github:JUSTDOITzhw/dsh-github-manager
+dsh plugin --profile web add github:JUSTDOITzhw/DSH-Github-Manager
 ```
 
 Restart `dsh web` afterwards — the client bundle is read once at activation.
