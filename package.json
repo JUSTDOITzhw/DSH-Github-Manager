@@ -1,6 +1,6 @@
 {
   "name": "dsh-github-manager",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Bind a GitHub account to dsh and manage repositories from a sidebar panel or by @-mentioning a repository in the composer: list, create, upload projects or single files, and delete. While an account is bound it also exposes the official GitHub MCP server to the conversation as mcp__github__* tools.",
   "type": "module",
   "main": "index.js",

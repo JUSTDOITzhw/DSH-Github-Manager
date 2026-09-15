@@ -376,6 +376,7 @@ try {
     createElement: (type, props, ...children) => ({ type, props, children }),
     useState: (initial) => [typeof initial === 'function' ? initial() : initial, () => {}],
     useEffect: () => {},
+    useRef: (initial) => ({ current: initial }),
     useCallback: (fn) => fn,
     Fragment: Symbol('Fragment'),
   }
@@ -447,23 +448,52 @@ try {
   check('client renders a rail layer', clientSource.includes('dsh-gm-rail'))
   check('client defaults to the wide presentation', clientSource.includes('dsh-gm-layer'))
 
-  /* `sidebar.footer.action` is a list slot rendered into ONE flex row, and
-     dsh-cost-meter parks its balance card in the same row while the shell clips
-     the column (`.sidebarCol{overflow:hidden}`). An action that claims the row
-     therefore does not crowd its neighbour, it pushes the neighbour out of the
-     column: the balance icon disappears. Our badge has to share the row. */
-  eq('the wide layer shares the row', decl(ci.CSS, '.dsh-gm-layer', 'flex'), '0 1 auto')
-  eq('the wide layer can shrink to nothing', decl(ci.CSS, '.dsh-gm-layer', 'min-width'), '0')
-  eq('the wide layer never claims the row', decl(ci.CSS, '.dsh-gm-layer', 'width'), 'auto')
-  eq('the wide layer centres against a taller neighbour', decl(ci.CSS, '.dsh-gm-layer', 'align-self'), 'center')
-  eq('the badge is content sized', decl(ci.CSS, '.dsh-gm-badge', 'width'), 'auto')
+  /* `sidebar.footer.action` is a list slot whose shipped occupants are full
+     width blocks (`ui-sidebar`'s Cordis button and dsh-cost-meter's balance
+     stack are both `width:100%`), so the shell's row is really a vertical stack
+     of lines that happens to be laid out horizontally. Two full-width blocks
+     cannot share one line — and the shell clips the column
+     (`.sidebarCol{overflow:hidden}`) — so the row is folded into a column and
+     this badge takes the last line, directly above Settings. */
+  check('client folds the shared action row into a column',
+    clientSource.includes('foldFooterRow(row, wide)') && clientSource.includes('flexDirection = "column"'))
+  check('the fold is owned by the slot node and unwound again',
+    clientSource.includes('layer.current.parentElement') && clientSource.includes('?? undefined'))
+  /* Ascending `order` decides the line. The number only has to beat the other
+     occupants of this slot, and dsh-cost-meter's highest is 2 (the shipped
+     Cordis button uses the default 0). */
+  const footerOrder = /id:\s*"github-manager",\n\s*order:\s*(\d+)/.exec(clientSource)
+  check('the badge is ordered below every other action',
+    footerOrder !== null && Number(footerOrder[1]) > 2,
+    footerOrder === null ? 'the slot entry declares no order' : footerOrder[1])
+
+  /* The fold rewrites an element the shell owns: it has to be reversible and
+     safe when the slot is not mounted. */
+  const foldable = { style: { flexDirection: 'row', alignItems: 'baseline' } }
+  const unfold = ci.foldFooterRow(foldable, true)
+  eq('the fold turns the row into a column', foldable.style.flexDirection, 'column')
+  eq('a wide column stretches its lines', foldable.style.alignItems, 'stretch')
+  unfold()
+  eq('unmounting restores the direction', foldable.style.flexDirection, 'row')
+  eq('unmounting restores the alignment', foldable.style.alignItems, 'baseline')
+  eq('folding a missing row is a no-op', ci.foldFooterRow(null, true), null)
+  const railRow = { style: {} }
+  ci.foldFooterRow(railRow, false)
+  eq('a rail column centres its icons', railRow.style.alignItems, 'center')
+
+  eq('the wide layer owns its line outright', decl(ci.CSS, '.dsh-gm-layer', 'flex'), '0 0 auto')
+  eq('the wide layer fills the line', decl(ci.CSS, '.dsh-gm-layer', 'width'), '100%')
+  eq('the wide layer never exceeds the line', decl(ci.CSS, '.dsh-gm-layer', 'max-width'), '100%')
+  check('the wide layer no longer centres against a neighbour',
+    decl(ci.CSS, '.dsh-gm-layer', 'align-self') === undefined)
+  eq('the badge fills the line like the Settings row', decl(ci.CSS, '.dsh-gm-badge', 'width'), '100%')
   eq('the badge can shrink', decl(ci.CSS, '.dsh-gm-badge', 'min-width'), '0')
   eq('the badge label can shrink', decl(ci.CSS, '.dsh-gm-badgeLabel', 'flex'), '0 1 auto')
-  check('the label truncates rather than pushing the row',
+  check('the label truncates rather than pushing the line',
     decl(ci.CSS, '.dsh-gm-badgeLabel', 'text-overflow') === 'ellipsis')
   check('nothing asks for a full-width track',
     /\.dsh-gm-(?:layer|badge)[^{}]*\{[^}]*width:calc\(100% \+/.test(ci.CSS) === false)
-  check('the badge does not fight the row with negative margins',
+  check('the badge does not fight the line with negative margins',
     decl(ci.CSS, '.dsh-gm-badge', 'margin') === '0')
 
   /* The folded rail is 56px wide with 10px of inline padding, so 36px of track
