@@ -941,6 +941,44 @@ try {
   check('CSS does not branch on a theme attribute', /\[data-theme/.test(ci.CSS) === false)
   check('the panel is positioned fixed', ci.CSS.includes('position:fixed'))
   check('a delete confirmation input exists', clientSource.includes('confirm'))
+
+  /* `--dsw-specific-menu` is a translucent fill outside darwin (58% alpha in
+     light, 45% in dark), so the fill alone painted a see-through panel: the
+     sidebar stayed legible through it. The shell's own surfaces pair that fill
+     with `--dsw-menu-backdrop-filter`, which is what turns it into a menu. */
+  eq('the panel frosts the fill instead of showing the sidebar through it',
+    decl(ci.CSS, '.dsh-gm-panel', 'backdrop-filter'), 'var(--dsw-menu-backdrop-filter)')
+  check('the panel still paints the shell menu fill',
+    decl(ci.CSS, '.dsh-gm-panel', 'background') === 'var(--dsw-specific-menu)')
+  eq('the sticky browse header frosts the rows it floats over',
+    decl(ci.CSS, '.dsh-gm-browseHead', 'backdrop-filter'), 'var(--dsw-menu-backdrop-filter)')
+  check('the frosted material is the shell token, not a literal',
+    /backdrop-filter:(?!var\(--dsw-menu-backdrop-filter\))/.test(ci.CSS) === false)
+
+  /* Dismissal is ours to implement: the slot stays mounted for the session, so
+     the shell never closes the panel. Only the panel and its own toggle keep it
+     up — closing on the badge's pointerdown would eat the click that is supposed
+     to flip the panel shut. */
+  check('client listens for a pointerdown to dismiss',
+    clientSource.includes('document.addEventListener("pointerdown", onPointerDown, true)'))
+  check('the dismissal listener is torn down with the panel',
+    clientSource.includes('document.removeEventListener("pointerdown", onPointerDown, true)'))
+  check('the dismissal listener exists only while the panel is open',
+    /if \(!open\) return undefined;/.test(clientSource))
+
+  const panelNode = { name: 'the panel', contains: (node) => node === insidePanel }
+  const badgeNode = { name: 'the toggle', contains: (node) => node === insideBadge }
+  const insidePanel = { name: 'a panel control' }
+  const insideBadge = { name: 'the badge label' }
+  const elsewhere = { name: 'the conversation' }
+  check('a click inside the panel keeps it open', ci.holdsPanelOpen(insidePanel, panelNode, badgeNode) === true)
+  check('a click on the badge is left to the badge', ci.holdsPanelOpen(insideBadge, panelNode, badgeNode) === true)
+  check('a click anywhere else dismisses the panel', ci.holdsPanelOpen(elsewhere, panelNode, badgeNode) === false)
+  check('the panel element itself counts as inside', ci.holdsPanelOpen(panelNode, panelNode, badgeNode) === true)
+  check('an unmounted panel cannot swallow the gesture', ci.holdsPanelOpen(elsewhere, null, badgeNode) === false)
+  check('a missing badge leaves the panel dismissible', ci.holdsPanelOpen(elsewhere, panelNode, null) === false)
+  check('a non-node target never keeps the panel open', ci.holdsPanelOpen(null, panelNode, badgeNode) === false)
+  check('a loose target never throws', ci.holdsPanelOpen('text', panelNode, badgeNode) === false)
 } finally {
   rmSync(root, { recursive: true, force: true })
 }

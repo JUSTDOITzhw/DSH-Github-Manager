@@ -36,6 +36,8 @@ Two ways, both in the panel's **账号 / Account** tab:
 
 The entry point is a **GitHub badge at the foot of the sidebar**, on the row above Settings. That row is the `sidebar.footer.action` slot and `dsh-cost-meter` parks its balance card in it too, so the badge is content-sized and ellipsizes the account name (`@JUSTDO…`) when space runs out rather than claiming the whole row — claiming it pushes the balance card out of a sidebar column the shell clips, and it disappears. In the 56px folded rail the badge keeps the mark only, because the rail has barely a dozen pixels left once the balance chip is in it.
 
+The panel closes on the **×** button, on **Escape**, or on a click anywhere outside it. That last one is on the plugin, not the shell: the sidebar column stays mounted for the whole session, so no menu machinery of the shell would ever fold the panel away.
+
 Pushing a directory creates the repository when it does not exist, skips `node_modules` / `.git` / build output and friends, and uploads file by file through the **Git Data API** (blobs → tree → commit → ref) — no git binary required. Anything skipped or failed is listed explicitly rather than dropped silently.
 
 ## Mention a repository in the composer
